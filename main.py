@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import re, json, os
+import re, json, os, time
 
 TOKEN = os.environ['TOKEN']
 
@@ -19,6 +19,8 @@ if os.path.exists(CONFIG_FILE):
 else:
     config = {"snipe_channels": {}, "position_channels": {}, "blacklist": {}}
 
+recent_links = {}  # {guild_id: {link: timestamp}}
+
 def save_config():
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
@@ -34,6 +36,10 @@ async def on_ready():
 
 @bot.tree.command(name="setsnipe", description="Set this channel to scan Roblox game links.")
 async def set_snipe(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You must have Administrator permissions to use this command.", ephemeral=True)
+        return
+
     gid = str(interaction.guild_id)
     cid = interaction.channel_id
 
@@ -47,6 +53,10 @@ async def set_snipe(interaction: discord.Interaction):
 
 @bot.tree.command(name="position", description="Set this channel to receive globally sniped links.")
 async def set_position(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You must have Administrator permissions to use this command.", ephemeral=True)
+        return
+
     gid = str(interaction.guild_id)
     cid = interaction.channel_id
 
@@ -114,7 +124,58 @@ async def on_message(message):
     if message.author.bot or not message.guild:
         return
 
-    if bot.user in message.mentions:
+    gid = str(message.guild.id)
+    snipe_channel_id = config.get("snipe_channels", {}).get(gid)
+
+    if message.channel.id == snipe_channel_id:
+        match = re.search(roblox_link_pattern, message.content)
+
+        # Delete if masked or blacklisted
+        if "://" in message.content and "[" in message.content:
+            await message.delete()
+            return
+
+        blacklist = config.get("blacklist", {}).get(gid, [])
+        if any(bad in message.content for bad in blacklist):
+            await message.delete()
+            return
+
+        if not match:
+            await message.delete()
+            return
+
+        link = match.group(0)
+
+        # Check recent links
+        now = time.time()
+        recent_links.setdefault(gid, {})
+        last_shared = recent_links[gid].get(link)
+
+        if last_shared and now - last_shared < 3600:
+            await message.delete()
+            await message.channel.send(f"{message.author.mention}, that link was already posted less than an hour ago.", delete_after=6)
+            return
+
+        # Update timestamp
+        recent_links[gid][link] = now
+
+        # Broadcast
+        for target_gid, pos_channel_id in config.get("position_channels", {}).items():
+            server = bot.get_guild(int(target_gid))
+            if server:
+                channel = server.get_channel(pos_channel_id)
+                if channel:
+                    embed = discord.Embed(
+                        title="Roblox Game Sniped!",
+                        description=f"[Click to view game]({link})",
+                        color=discord.Color.from_rgb(180, 50, 255)
+                    )
+                    embed.add_field(name="Source Server", value=message.guild.name, inline=False)
+                    embed.set_footer(text="Bot by YourServerName | discord.gg/YourInvite")
+                    embed.timestamp = message.created_at
+                    await channel.send(embed=embed)
+
+    elif bot.user in message.mentions:
         embed = discord.Embed(
             title="Need Help?",
             description="Use the slash commands below to control the bot.",
@@ -125,40 +186,5 @@ async def on_message(message):
         embed.add_field(name="/position", value="Receive sniped links in this channel", inline=False)
         embed.set_footer(text="Bot by YourServerName | discord.gg/YourInvite")
         await message.channel.send(embed=embed)
-
-    gid = str(message.guild.id)
-    snipe_channel_id = config.get("snipe_channels", {}).get(gid)
-
-    if message.channel.id != snipe_channel_id:
-        return
-
-    urls = re.findall(roblox_link_pattern, message.content)
-    if not urls:
-        return
-
-    if "://" in message.content and "[" in message.content:
-        return  # Masked/embedded link
-
-    blacklist = config.get("blacklist", {}).get(gid, [])
-    if any(bad in message.content for bad in blacklist):
-        return
-
-    for gid, pos_channel_id in config.get("position_channels", {}).items():
-        server = bot.get_guild(int(gid))
-        if server:
-            channel = server.get_channel(pos_channel_id)
-            if channel:
-                match = re.search(r"https?://(?:www\.)?roblox\.com/(games|game|experiences)/\d+", message.content)
-                if match:
-                    link = match.group(0)
-                    embed = discord.Embed(
-                        title="Roblox Game Sniped!",
-                        description=f"[Click to view game]({link})",
-                        color=discord.Color.from_rgb(180, 50, 255)
-                    )
-                    embed.add_field(name="Source Server", value=message.guild.name, inline=False)
-                    embed.set_footer(text="Bot by YourServerName | discord.gg/YourInvite")
-                    embed.timestamp = message.created_at
-                    await channel.send(embed=embed)
 
 bot.run(TOKEN)
