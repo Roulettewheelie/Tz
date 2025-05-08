@@ -174,7 +174,7 @@ async def on_message(message):
                     color=discord.Color.from_rgb(180, 50, 255)
                 )
                 embed.add_field(name="Source Server", value=message.guild.name, inline=False)
-                embed.set_footer(text="Bot by YourServerName | discord.gg/YourInvite")
+                embed.set_footer(text="Bot by TMW's condos | discord.gg/GyEEVWya")
                 embed.timestamp = message.created_at
                 try:
                     await channel.send(embed=embed)
