@@ -1,1 +1,6 @@
-discord.py
+cloudscraper==1.2.71
+discord.py==2.3.2
+toml==0.10.2
+requests==2.31.0
+aiohttp==3.9.5
+python-dotenv==1.0.1

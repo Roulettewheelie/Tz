@@ -1,0 +1,11 @@
+RBXLPath = "baitgame.rbxl"
+AvatarType = "R6"
+PrivateServers = true
+Price = 0
+StudioAccessAPI = true
+ThirdPartySales = true
+ThirdPartyTP = true
+HttpsEnabled = true
+max_players = 200
+file = "bait.rbxl"
+actual_game = "baitgame.rbxl"
