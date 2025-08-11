@@ -85,4 +85,5 @@ async def baitgame(interaction: discord.Interaction, cookie: str):
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {str(e)}")
 
-bot.run("MTQwNDQ0Nzc0OTMxNDcwNzYwNw.Gtm6Ud.rcW_QQV8K4Hdpmvl_CJpefLdbApP-3lwS5wdco")
+
+bot.run("TOKEN")
